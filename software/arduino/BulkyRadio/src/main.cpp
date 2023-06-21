@@ -10,8 +10,10 @@
 
 AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ENC_CLK, ENC_DT, -1, -1, ENC_STEPS);
 U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
-Audio audio;
 ezButton button(ENC_SW);
+
+Audio audio;
+bool is_muted = true;
 
 bool screen_updated = true;
 unsigned long last_update = millis();
@@ -50,6 +52,20 @@ bool timeout(uint8_t new_screen, uint8_t seconds) {
   return false;
 }
 
+void set_muted(bool muted) {
+  is_muted = muted;
+  digitalWrite(I2S_MUTE, (is_muted ? HIGH : LOW));
+}
+
+void mute_dac() {
+  set_muted(true);
+}
+
+void unmute_dac() {
+  set_muted(false);
+}
+
+
 void handle_screen_connect() {
   // audio.connecttohost("https://lyd.nrk.no/nrk_radio_p3_mp3_h");
   audio.connecttohost("http://s1.a1radio.nl:8054/;");
@@ -58,6 +74,7 @@ void handle_screen_connect() {
   // http://lyd.nrk.no/nrk_radio_p3_mp3_h
 
   if (audio.isRunning()) {
+    unmute_dac();
     set_screen(SCREEN_MAIN);
   } else {
     delay(500);
@@ -80,12 +97,10 @@ void volume_down() {
   }
 }
 
-bool muted = false;
 void handle_screen_main() {
   switch (get_action()) {
     case ACTION_CLICK:
-      muted = !muted;
-      digitalWrite(I2S_MUTE, (muted ? HIGH : LOW));
+      set_muted(!is_muted);
       break;
 
     case ACTION_NEXT:
@@ -115,6 +130,7 @@ void handle_screen_volume() {
 
 void handle_actions() {
   if (cur_screen != SCREEN_CONNECT && !audio.isRunning()) {
+    mute_dac();
     set_screen(SCREEN_CONNECT);
   }
 
@@ -226,7 +242,7 @@ void setup() {
   // u8x8.setFont(u8x8_font_5x8_f);
 
   pinMode(ONBOARD_LED, OUTPUT);
-  digitalWrite(I2S_MUTE, LOW);
+  mute_dac();
   pinMode(I2S_MUTE, OUTPUT);
 
   WiFi.disconnect();
