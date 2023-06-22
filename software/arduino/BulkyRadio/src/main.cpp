@@ -100,7 +100,7 @@ void volume_down() {
 void handle_screen_main() {
   switch (get_action()) {
     case ACTION_CLICK:
-      set_muted(!is_muted);
+      set_screen(SCREEN_VERSION);
       break;
 
     case ACTION_NEXT:
@@ -128,6 +128,16 @@ void handle_screen_volume() {
   }
 }
 
+void handle_screen_version() {
+  if (timeout(SCREEN_MAIN, SCREEN_MAX_IDLE)) return;
+
+  switch (get_action()) {
+    case ACTION_CLICK:
+      set_screen(SCREEN_MAIN);
+      break;
+  }
+}
+
 void handle_actions() {
   if (cur_screen != SCREEN_CONNECT && !audio.isRunning()) {
     mute_dac();
@@ -138,6 +148,7 @@ void handle_actions() {
     case SCREEN_CONNECT: handle_screen_connect(); break;
     case SCREEN_MAIN: handle_screen_main(); break;
     case SCREEN_VOLUME: handle_screen_volume(); break;
+    case SCREEN_VERSION: handle_screen_version(); break;
   }
 }
 
@@ -217,11 +228,21 @@ void update_screen_volume() {
   }
 }
 
+void update_screen_version() {
+  if (screen_updated) {
+    u8x8.clearDisplay();
+    oled_title(ICON_INFORMATION, "Version");
+    u8x8.drawString(6, 4, VERSION);
+    screen_updated = false;
+  }
+}
+
 void update_screen() {
   switch(cur_screen) {
     case SCREEN_CONNECT: update_screen_connect(); break;
     case SCREEN_MAIN: update_screen_main(); break;
     case SCREEN_VOLUME: update_screen_volume(); break;
+    case SCREEN_VERSION: update_screen_version(); break;
   }
 }
 
@@ -248,6 +269,7 @@ void setup() {
   WiFi.disconnect();
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
+
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     digitalWrite(ONBOARD_LED, LOW);

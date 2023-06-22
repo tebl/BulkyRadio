@@ -1,4 +1,6 @@
 #pragma once
+#define VERSION "0.1"
+
 #define ONBOARD_LED  2
 #define I2S_DOUT 25
 #define I2S_BCLK 27
@@ -27,7 +29,7 @@
 #define DEBOUNCE_DELAY 50
 #define BUTTON_LONGPRESS 250
 
-#define ICON_COUNT 12
+#define ICON_COUNT 13
 uint8_t oled_icons[ICON_COUNT * 8] = {
   0x00, 0x7E, 0x7E, 0x3C, 0x3C, 0x18, 0x18, 0x00, // Play
   0x00, 0x7E, 0x7E, 0x00, 0x00, 0x7E, 0x7E, 0x00, // Pause
@@ -41,6 +43,7 @@ uint8_t oled_icons[ICON_COUNT * 8] = {
   0x00, 0x00, 0x00, 0x00, 0x7E, 0xFF, 0x81, 0x00, // Lower bounds
   0x00, 0x81, 0xFF, 0x7E, 0x00, 0x00, 0x00, 0x00, // Upper bounds
   0x00, 0x09, 0x04, 0x04, 0x09, 0xC0, 0x20, 0xA0, // Unconnected
+  0x0C, 0x12, 0x22, 0x44, 0x44, 0x22, 0x12, 0x0C, // Information
 };
 #define ICON_PLAY 0
 #define ICON_PAUSE 1
@@ -54,8 +57,11 @@ uint8_t oled_icons[ICON_COUNT * 8] = {
 #define ICON_LOWER 9
 #define ICON_UPPER 10
 #define ICON_UNCONNECTED 11
+#define ICON_INFORMATION 12
 
 #define SCREEN_MAX_IDLE 5
 #define SCREEN_CONNECT 0
 #define SCREEN_MAIN 1
 #define SCREEN_VOLUME 2
+#define SCREEN_MENU 3
+#define SCREEN_VERSION 4
