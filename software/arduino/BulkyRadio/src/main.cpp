@@ -5,9 +5,11 @@
 #include <U8x8lib.h>
 #include <AiEsp32RotaryEncoder.h>
 #include <ezButton.h>
+#include <Preferences.h>
 #include "constants.h"
 #include "settings.h"
 
+Preferences preferences;
 AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ENC_CLK, ENC_DT, -1, -1, ENC_STEPS);
 U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 ezButton button(ENC_SW);
@@ -19,15 +21,18 @@ bool screen_updated = true;
 unsigned long last_update = millis();
 uint8_t cur_screen = SCREEN_CONNECT;
 uint8_t cur_volume = DEFAULT_VOLUME;
+uint8_t cur_option = 0;
+uint8_t cur_station = 0;
+uint8_t sel_station = 0;
 
 bool info_updated = false;
-char info_station[STR_MAX_LENGTH];
-char info_title[STR_MAX_LENGTH];
-char info_bits[STR_MAX_LENGTH];
+char info_station[INFO_LEN_STATION];
+char info_title[INFO_LEN_TITLE];
+char info_bits[INFO_LEN_BITS];
 bool connected = false;
 
 uint8_t get_action() {
-  if (button.isPressed()) {
+  if (button.isReleased()) {
     return ACTION_CLICK;
   }
 
@@ -81,26 +86,34 @@ void handle_screen_connect() {
   }
 }
 
+void write_volume() {
+  preferences.begin(app_name, PREFERENCES_RW);
+  preferences.putShort("volume", cur_volume);
+  preferences.end();
+  audio.setVolume(cur_volume);
+}
+
 void volume_up() {
   set_screen(SCREEN_VOLUME);
   if (cur_volume < MAX_VOLUME) {
     cur_volume = cur_volume + 1;
   }
-  audio.setVolume(cur_volume);
+  write_volume();
 }
 
 void volume_down() {
   set_screen(SCREEN_VOLUME);
   if (cur_volume > 0) {
     cur_volume = cur_volume - 1;
-    audio.setVolume(cur_volume);
   }
+  write_volume();
 }
 
 void handle_screen_main() {
   switch (get_action()) {
     case ACTION_CLICK:
-      set_screen(SCREEN_VERSION);
+      cur_option = OPTION_FIRST_ID;
+      set_screen(SCREEN_MENU);
       break;
 
     case ACTION_NEXT:
@@ -128,14 +141,50 @@ void handle_screen_volume() {
   }
 }
 
-void handle_screen_version() {
+void handle_screen_info() {
+  if (timeout(SCREEN_MENU, SCREEN_MAX_IDLE)) return;
+
+  switch (get_action()) {
+    case ACTION_CLICK:
+      cur_option = OPTION_BACK;
+      set_screen(SCREEN_MENU);
+      break;
+  }
+}
+
+void handle_screen_menu() {
   if (timeout(SCREEN_MAIN, SCREEN_MAX_IDLE)) return;
 
   switch (get_action()) {
     case ACTION_CLICK:
-      set_screen(SCREEN_MAIN);
+      switch(cur_option) {
+        case OPTION_STATIONS: set_screen(SCREEN_STATIONS); break;
+        case OPTION_DETAILS: set_screen(SCREEN_DETAILS); break;
+        case OPTION_VERSION: set_screen(SCREEN_VERSION); break;
+        case OPTION_BACK: set_screen(SCREEN_MAIN); break;
+      }
+      break;
+    
+    case ACTION_NEXT:
+      last_update = millis();
+      if (cur_option != OPTION_LAST_ID) {
+        cur_option++;
+        screen_updated = true;
+      }
+      break;
+
+    case ACTION_PREV:
+      last_update = millis();
+      if (cur_option != OPTION_FIRST_ID) {
+        cur_option--;
+        screen_updated = true;
+      }
       break;
   }
+}
+
+void handle_screen_stations() {
+  if (timeout(SCREEN_MENU, SCREEN_MAX_IDLE)) return;
 }
 
 void handle_actions() {
@@ -148,7 +197,10 @@ void handle_actions() {
     case SCREEN_CONNECT: handle_screen_connect(); break;
     case SCREEN_MAIN: handle_screen_main(); break;
     case SCREEN_VOLUME: handle_screen_volume(); break;
-    case SCREEN_VERSION: handle_screen_version(); break;
+    case SCREEN_MENU: handle_screen_menu(); break;
+    case SCREEN_VERSION: handle_screen_info(); break;
+    case SCREEN_DETAILS: handle_screen_info(); break;
+    case SCREEN_STATIONS: handle_screen_stations(); break;
   }
 }
 
@@ -186,14 +238,35 @@ void update_screen_connect() {
   }
 }
 
+void oled_span(uint8_t x, uint8_t y, const char *string, uint8_t num_lines = 2) {
+  bool truncated = false;
+
+  uint8_t cur_x = x;
+  uint8_t cur_y = y;
+  for (int pos = 0; pos < strlen(string); pos++) {
+    u8x8.drawGlyph(cur_x, cur_y, string[pos]);
+    cur_x++;
+    if (cur_x == OLED_COLS) {
+      cur_x = 0;
+      cur_y++;
+      if (cur_y == (y + num_lines)) {
+        truncated = true;
+        break;
+      }
+    }
+  }
+
+  if (truncated) oled_icon(15, y + (num_lines - 1), ICON_TRUNCATED);
+}
+
 void update_screen_main() {
   if (screen_updated || info_updated) {
     u8x8.clearDisplay();
 
     oled_title(ICON_WIFI, WIFI_SSID);
-    u8x8.drawString(0, 2, info_station);
-    u8x8.drawString(0, 3, info_title);
-    u8x8.drawString(0, 4, info_bits);
+    oled_span(0, 2, info_station, 2);
+    oled_span(0, 5, info_title, 3);
+
     info_updated = false;
     screen_updated = false;
   }
@@ -232,7 +305,52 @@ void update_screen_version() {
   if (screen_updated) {
     u8x8.clearDisplay();
     oled_title(ICON_INFORMATION, "Version");
-    u8x8.drawString(6, 4, VERSION);
+    u8x8.drawString(6, 4, app_version);
+    screen_updated = false;
+  }
+}
+
+void update_screen_details() {
+  if (screen_updated) {
+    u8x8.clearDisplay();
+    oled_title(ICON_INFORMATION, "Details");
+
+    u8x8.drawString(0, 3, "Codec:");
+    u8x8.drawString(0, 4, audio.getCodecname());
+
+    u8x8.drawString(0, 5, "Bitrate:");
+    u8x8.drawString(0, 6, info_bits);
+    screen_updated = false;
+  }
+}
+
+void update_screen_stations() {
+  if (screen_updated) {
+    u8x8.clearDisplay();
+    oled_title(ICON_NOTE, "Stations");
+
+    screen_updated = false;
+  }
+}
+
+void update_menu_option(uint8_t id, uint8_t y, const char *title) {
+  if (cur_option == id) {
+    oled_icon(0, y, ICON_OPTION);
+  } else {
+    u8x8.drawGlyph(0, y, ' ');
+  }
+  u8x8.drawString(1, y, title);
+}
+
+void update_screen_menu() {
+  if (screen_updated) {
+    u8x8.clearDisplay();
+    oled_title(ICON_INFORMATION, "Menu");
+
+    update_menu_option(OPTION_STATIONS, 2, "Stations");
+    update_menu_option(OPTION_DETAILS, 3, "Details");
+    update_menu_option(OPTION_VERSION, 4, "Version");
+    update_menu_option(OPTION_BACK, 5, "Back");
     screen_updated = false;
   }
 }
@@ -242,7 +360,10 @@ void update_screen() {
     case SCREEN_CONNECT: update_screen_connect(); break;
     case SCREEN_MAIN: update_screen_main(); break;
     case SCREEN_VOLUME: update_screen_volume(); break;
+    case SCREEN_MENU: update_screen_menu(); break;
     case SCREEN_VERSION: update_screen_version(); break;
+    case SCREEN_DETAILS: update_screen_details(); break;
+    case SCREEN_STATIONS: update_screen_stations(); break;
   }
 }
 
@@ -252,6 +373,9 @@ void IRAM_ATTR readEncoderISR() {
 
 void setup() {
   Serial.begin(115200);
+  preferences.begin(app_name, PREFERENCES_RO);
+  cur_volume = preferences.getShort("volume", 10);
+  preferences.end();
 
   rotaryEncoder.disableAcceleration();
   rotaryEncoder.begin();
@@ -259,8 +383,11 @@ void setup() {
   button.setDebounceTime(DEBOUNCE_DELAY);
 
   u8x8.begin();
-  u8x8.setFont(u8x8_font_amstrad_cpc_extended_f);
+  // u8x8.setFont(u8x8_font_amstrad_cpc_extended_f);
   // u8x8.setFont(u8x8_font_5x8_f);
+  // u8x8.setFont(u8x8_font_pxplusibmcga_f);
+  // u8x8.setFont(u8x8_font_pxplusibmcgathin_f);
+  u8x8.setFont(u8x8_font_pxplustandynewtv_f);
 
   pinMode(ONBOARD_LED, OUTPUT);
   mute_dac();
@@ -278,7 +405,7 @@ void setup() {
   }
   digitalWrite(ONBOARD_LED, HIGH);
   audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-  audio.setVolume(10); // 0...21
+  audio.setVolume(cur_volume);
 }
 
 void loop() {
@@ -289,9 +416,9 @@ void loop() {
   audio.loop();
 }
 
-void copy_string(char *destination, const char *source) {
+void copy_string(char *destination, const char *source, const uint8_t max_length) {
   bool eof = false;
-  for (int i = 0; i < (STR_MAX_LENGTH - 1); i++) {
+  for (int i = 0; i < (max_length - 1); i++) {
     if (!eof) {
       if (source[i] == 0) {
         eof = true;
@@ -303,6 +430,7 @@ void copy_string(char *destination, const char *source) {
       }
     } else destination[i] = 0;
   }
+  destination[max_length - 1] = 0;
 }
 
 // void audio_info(const char *info){
@@ -310,13 +438,13 @@ void copy_string(char *destination, const char *source) {
 // }
 
 void audio_showstation(const char *info) {
-    copy_string(info_station, info);
+  copy_string(info_station, info, INFO_LEN_STATION);
 }
 
 void audio_showstreamtitle(const char *info) {
-    copy_string(info_title, info);
+  copy_string(info_title, info, INFO_LEN_TITLE);
 }
 
 void audio_bitrate(const char *info) {
-    copy_string(info_bits, info);
+  copy_string(info_bits, info, INFO_LEN_BITS);
 }
