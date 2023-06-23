@@ -1,0 +1,10 @@
+{
+  "s0": {
+    "t": "SID",
+    "u": "http://s1.a1radio.nl:8054/;"
+  },
+  "s1": {
+    "t": "NRK P3",
+    "u": "https://lyd.nrk.no/nrk_radio_p3_mp3_h"
+  }
+}
