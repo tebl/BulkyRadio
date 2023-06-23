@@ -30,6 +30,7 @@ char info_station[INFO_LEN_STATION];
 char info_title[INFO_LEN_TITLE];
 char info_bits[INFO_LEN_BITS];
 bool connected = false;
+uint8_t sync_state = 0;
 
 uint8_t get_action() {
   if (button.isReleased()) {
@@ -46,6 +47,12 @@ void set_screen(uint8_t new_screen) {
   cur_screen = new_screen;
   last_update = millis();
   screen_updated = true;
+}
+
+void set_sync_state(uint8_t new_state) {
+  sync_state = new_state;
+  screen_updated = true;
+  last_update = millis();
 }
 
 bool timeout(uint8_t new_screen, uint8_t seconds) {
@@ -161,6 +168,10 @@ void handle_screen_menu() {
         case OPTION_STATIONS: set_screen(SCREEN_STATIONS); break;
         case OPTION_DETAILS: set_screen(SCREEN_DETAILS); break;
         case OPTION_VERSION: set_screen(SCREEN_VERSION); break;
+        case OPTION_SYNC:
+          set_sync_state(SYNC_IDLE);
+          set_screen(SCREEN_SYNC);
+          break;
         case OPTION_BACK: set_screen(SCREEN_MAIN); break;
       }
       break;
@@ -187,6 +198,25 @@ void handle_screen_stations() {
   if (timeout(SCREEN_MENU, SCREEN_MAX_IDLE)) return;
 }
 
+void handle_screen_sync() {
+  switch (sync_state) {
+    case SYNC_IDLE:
+      set_sync_state(SYNC_STARTED);
+      return;
+    
+    case SYNC_STARTED:
+      set_sync_state(SYNC_DONE);
+      return;
+
+    case SYNC_DONE:
+    case SYNC_ERROR:
+    default:
+      break;
+  }
+
+  handle_screen_info();
+}
+
 void handle_actions() {
   if (cur_screen != SCREEN_CONNECT && !audio.isRunning()) {
     mute_dac();
@@ -201,6 +231,7 @@ void handle_actions() {
     case SCREEN_VERSION: handle_screen_info(); break;
     case SCREEN_DETAILS: handle_screen_info(); break;
     case SCREEN_STATIONS: handle_screen_stations(); break;
+    case SCREEN_SYNC: handle_screen_sync(); break;
   }
 }
 
@@ -350,7 +381,31 @@ void update_screen_menu() {
     update_menu_option(OPTION_STATIONS, 2, "Stations");
     update_menu_option(OPTION_DETAILS, 3, "Details");
     update_menu_option(OPTION_VERSION, 4, "Version");
-    update_menu_option(OPTION_BACK, 5, "Back");
+    update_menu_option(OPTION_SYNC, 5, "Sync");
+    update_menu_option(OPTION_BACK, 7, "Back");
+    screen_updated = false;
+  }
+}
+
+void update_screen_sync() {
+  if (screen_updated) {
+    u8x8.clearDisplay();
+    oled_title(ICON_WIFI, "Sync");
+
+    switch(sync_state) {
+      case SYNC_DONE:
+        u8x8.drawString(5, 4, "Done!");
+        break;
+
+      case SYNC_ERROR:
+        u8x8.drawString(3, 4, "Failed!");
+        break;
+
+      default:
+        u8x8.drawString(2, 4, "Working ...");
+        break;
+    }
+
     screen_updated = false;
   }
 }
@@ -364,6 +419,7 @@ void update_screen() {
     case SCREEN_VERSION: update_screen_version(); break;
     case SCREEN_DETAILS: update_screen_details(); break;
     case SCREEN_STATIONS: update_screen_stations(); break;
+    case SCREEN_SYNC: update_screen_sync(); break;
   }
 }
 
