@@ -37,7 +37,7 @@ const char *app_version = "0.1";
 #define DEBOUNCE_DELAY 50
 #define BUTTON_LONGPRESS 250
 
-#define ICON_COUNT 15
+#define ICON_COUNT 16
 uint8_t oled_icons[ICON_COUNT * 8] = {
   0x00, 0x7E, 0x7E, 0x3C, 0x3C, 0x18, 0x18, 0x00, // Play
   0x00, 0x7E, 0x7E, 0x00, 0x00, 0x7E, 0x7E, 0x00, // Pause
@@ -54,6 +54,7 @@ uint8_t oled_icons[ICON_COUNT * 8] = {
   0x0C, 0x12, 0x22, 0x44, 0x44, 0x22, 0x12, 0x0C, // Information
   0x00, 0x00, 0xFE, 0x82, 0x44, 0x28, 0x10, 0x00, // Option
   0x60, 0x60, 0x00, 0x60, 0x60, 0x00, 0x60, 0x60, // Truncated
+  0x7E, 0x81, 0x81, 0x89, 0x99, 0x3E, 0x18, 0x08, // Sync
 };
 #define ICON_PLAY 0
 #define ICON_PAUSE 1
@@ -70,6 +71,7 @@ uint8_t oled_icons[ICON_COUNT * 8] = {
 #define ICON_INFORMATION 12
 #define ICON_OPTION 13
 #define ICON_TRUNCATED 14
+#define ICON_SYNC 15
 
 #define SCREEN_MAX_IDLE 5
 #define SCREEN_CONNECT 0
@@ -92,4 +94,5 @@ uint8_t oled_icons[ICON_COUNT * 8] = {
 #define SYNC_IDLE 0
 #define SYNC_STARTED 1
 #define SYNC_ERROR 2
-#define SYNC_DONE 3
+#define SYNC_PARSE_ERROR 3
+#define SYNC_DONE 4

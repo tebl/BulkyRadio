@@ -1,11 +1,14 @@
-#include <Arduino.h>
-#include <WiFi.h>
-#include <Audio.h>
-#include <Wire.h>
-#include <U8x8lib.h>
 #include <AiEsp32RotaryEncoder.h>
+#include <Arduino.h>
+#include <ArduinoJson.h>
+#include <Audio.h>
 #include <ezButton.h>
+#include <HTTPClient.h>
 #include <Preferences.h>
+#include <U8x8lib.h>
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <Wire.h>
 #include "constants.h"
 #include "settings.h"
 
@@ -198,6 +201,87 @@ void handle_screen_stations() {
   if (timeout(SCREEN_MENU, SCREEN_MAX_IDLE)) return;
 }
 
+void preferences_put_string(const char *key, const char *value) {
+  preferences.putString(key, value);
+  Serial.print(key);
+  Serial.print(":");
+  Serial.println(value);
+}
+
+void preferences_delete(const char *key) {
+  if (preferences.isKey(key)) {
+    Serial.print("Removing ");
+    Serial.println(key);
+    preferences.remove(key);
+  }
+}
+
+void preferences_generate_name(const char *key_title, const char *station_url) {
+  if (strncmp(station_url, "http://", 7) == 0) station_url += 7;
+  if (strncmp(station_url, "https://", 8) == 0) station_url += 8;
+  if (strncmp(station_url, "www.", 4) == 0) station_url += 4;
+
+  char name[OLED_COLS];
+  strncat(name, station_url, 14);
+  preferences_put_string(key_title, name);
+}
+
+void perform_sync() {
+  WiFiClientSecure client;
+  HTTPClient https;
+  
+  client.setCACert(sync_ca);
+  if (https.begin(client, sync_url)) {
+    int httpCode = https.GET();
+
+    if (httpCode > 0) {
+      Serial.printf("[HTTPS] GET... code: %d\n", httpCode);
+
+      // file found at server
+      if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
+        const size_t capacity = JSON_OBJECT_SIZE(6) + 300;
+        DynamicJsonDocument doc(capacity);
+        DeserializationError error = deserializeJson(doc, https.getString());
+
+        if (error) {
+          Serial.print("Parse error: ");
+          Serial.println(error.f_str());
+          set_sync_state(SYNC_PARSE_ERROR);
+        } else {
+          preferences.begin(app_name, PREFERENCES_RW);
+
+          char key[] = "s0"; 
+          char key_title[] = "s0t";
+          for (int i = 0; i < 6; i++) {
+            key[1] = '0' + i;
+            key_title[1] = '0' + i;
+
+            if (doc.containsKey(key) and strlen(doc[key]) > 0) {
+              preferences_put_string(key, doc[key]);
+
+              if (doc.containsKey(key_title) and strlen(doc[key_title]) > 0) {
+                preferences_put_string(key_title, doc[key_title]);
+              } else {
+                preferences_generate_name(key_title, doc[key]);
+              }
+            } else {
+              preferences_delete(key);
+              preferences_delete(key_title);
+            }
+          }
+          preferences.end();
+
+          set_sync_state(SYNC_DONE);
+        }
+      }
+    } else {
+      set_sync_state(SYNC_ERROR);
+    }
+
+    https.end();
+  }  
+}
+
 void handle_screen_sync() {
   switch (sync_state) {
     case SYNC_IDLE:
@@ -205,20 +289,27 @@ void handle_screen_sync() {
       return;
     
     case SYNC_STARTED:
-      set_sync_state(SYNC_DONE);
+      audio.stopSong();
+      perform_sync();
       return;
 
+    case SYNC_PARSE_ERROR:
     case SYNC_DONE:
     case SYNC_ERROR:
     default:
       break;
   }
 
-  handle_screen_info();
+  if (timeout(SCREEN_CONNECT, 2 * SCREEN_MAX_IDLE)) return;
+  switch (get_action()) {
+    case ACTION_CLICK:
+      set_screen(SCREEN_CONNECT);
+      break;
+  }
 }
 
 void handle_actions() {
-  if (cur_screen != SCREEN_CONNECT && !audio.isRunning()) {
+  if (cur_screen != SCREEN_SYNC && cur_screen != SCREEN_CONNECT && !audio.isRunning()) {
     mute_dac();
     set_screen(SCREEN_CONNECT);
   }
@@ -390,7 +481,7 @@ void update_screen_menu() {
 void update_screen_sync() {
   if (screen_updated) {
     u8x8.clearDisplay();
-    oled_title(ICON_WIFI, "Sync");
+    oled_title(ICON_SYNC, "Sync");
 
     switch(sync_state) {
       case SYNC_DONE:
@@ -399,6 +490,10 @@ void update_screen_sync() {
 
       case SYNC_ERROR:
         u8x8.drawString(3, 4, "Failed!");
+        break;
+
+      case SYNC_PARSE_ERROR:
+        u8x8.drawString(3, 2, "Parse error!");
         break;
 
       default:
