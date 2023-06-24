@@ -18,7 +18,9 @@ U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 ezButton button(ENC_SW);
 
 Audio audio;
+uint8_t reconnects = 0;
 bool is_muted = true;
+bool is_halted = false;
 
 bool screen_updated = true;
 unsigned long last_update = millis();
@@ -80,19 +82,45 @@ void unmute_dac() {
   set_muted(false);
 }
 
+void set_halted(bool value) {
+  if (value) {
+    audio.stopSong();
+    mute_dac();
+  } else {
+    reconnects = 0;
+  }
+  is_halted = value;
+}
 
-void handle_screen_connect() {
-  // audio.connecttohost("https://lyd.nrk.no/nrk_radio_p3_mp3_h");
-  audio.connecttohost("http://s1.a1radio.nl:8054/;");
-  // https://lyd.nrk.no/nrk_radio_p3_aac_l
-  // 
-  // http://lyd.nrk.no/nrk_radio_p3_mp3_h
+void perform_connect() {
+  preferences.begin(app_name, PREFERENCES_RO);
 
+  char key[] = "s0";
+  key[1] = '0' + sel_station;
+
+  String url = preferences.getString(key);
+  if (url != NULL) {
+    audio.connecttohost(url.c_str());
+  }
+
+  preferences.end();
+}
+
+void handle_actions_connect() {
+  set_halted(false);
+
+  perform_connect();
   if (audio.isRunning()) {
     unmute_dac();
     set_screen(SCREEN_MAIN);
   } else {
-    delay(500);
+    reconnects++;
+    if (reconnects == MAX_RECONNECT) {
+      set_halted(true);
+      set_screen(SCREEN_MAIN);
+    } else {
+      delay(DELAY_ATTEMPT * 1000);
+    }
   }
 }
 
@@ -119,7 +147,7 @@ void volume_down() {
   write_volume();
 }
 
-void handle_screen_main() {
+void handle_actions_main() {
   switch (get_action()) {
     case ACTION_CLICK:
       cur_option = OPTION_FIRST_ID;
@@ -135,7 +163,7 @@ void handle_screen_main() {
   }
 }
 
-void handle_screen_volume() {
+void handle_actions_volume() {
   if (timeout(SCREEN_MAIN, SCREEN_MAX_IDLE)) return;
 
   switch (get_action()) {
@@ -151,7 +179,7 @@ void handle_screen_volume() {
   }
 }
 
-void handle_screen_info() {
+void handle_actions_info() {
   if (timeout(SCREEN_MENU, SCREEN_MAX_IDLE)) return;
 
   switch (get_action()) {
@@ -162,13 +190,16 @@ void handle_screen_info() {
   }
 }
 
-void handle_screen_menu() {
+void handle_actions_menu() {
   if (timeout(SCREEN_MAIN, SCREEN_MAX_IDLE)) return;
 
   switch (get_action()) {
     case ACTION_CLICK:
       switch(cur_option) {
-        case OPTION_STATIONS: set_screen(SCREEN_STATIONS); break;
+        case OPTION_STATIONS:
+          cur_station = sel_station;
+          set_screen(SCREEN_STATIONS);
+          break;
         case OPTION_DETAILS: set_screen(SCREEN_DETAILS); break;
         case OPTION_VERSION: set_screen(SCREEN_VERSION); break;
         case OPTION_SYNC:
@@ -197,8 +228,39 @@ void handle_screen_menu() {
   }
 }
 
-void handle_screen_stations() {
-  if (timeout(SCREEN_MENU, SCREEN_MAX_IDLE)) return;
+void write_station() {
+  sel_station = cur_station;
+
+  preferences.begin(app_name, PREFERENCES_RW);
+  preferences.putShort("station", sel_station);
+  preferences.end();
+}
+
+void handle_actions_stations() {
+  if (timeout(SCREEN_MAIN, SCREEN_MAX_IDLE)) return;
+
+  switch (get_action()) {
+    case ACTION_CLICK:
+      write_station();
+      set_screen(SCREEN_CONNECT);
+      break;
+    
+    case ACTION_NEXT:
+      last_update = millis();
+      if (cur_station != (MAX_STATIONS - 1)) {
+        cur_station++;
+        screen_updated = true;
+      }
+      break;
+
+    case ACTION_PREV:
+      last_update = millis();
+      if (cur_station != FIRST_STATION) {
+        cur_station--;
+        screen_updated = true;
+      }
+      break;
+  }
 }
 
 void preferences_put_string(const char *key, const char *value) {
@@ -252,7 +314,7 @@ void perform_sync() {
 
           char key[] = "s0"; 
           char key_title[] = "s0t";
-          for (int i = 0; i < 6; i++) {
+          for (int i = 0; i < MAX_STATIONS; i++) {
             key[1] = '0' + i;
             key_title[1] = '0' + i;
 
@@ -282,14 +344,14 @@ void perform_sync() {
   }  
 }
 
-void handle_screen_sync() {
+void handle_actions_sync() {
   switch (sync_state) {
     case SYNC_IDLE:
       set_sync_state(SYNC_STARTED);
       return;
     
     case SYNC_STARTED:
-      audio.stopSong();
+      set_halted(true);
       perform_sync();
       return;
 
@@ -309,20 +371,20 @@ void handle_screen_sync() {
 }
 
 void handle_actions() {
-  if (cur_screen != SCREEN_SYNC && cur_screen != SCREEN_CONNECT && !audio.isRunning()) {
+  if (!is_halted && !audio.isRunning()) {
     mute_dac();
     set_screen(SCREEN_CONNECT);
   }
 
   switch(cur_screen) {
-    case SCREEN_CONNECT: handle_screen_connect(); break;
-    case SCREEN_MAIN: handle_screen_main(); break;
-    case SCREEN_VOLUME: handle_screen_volume(); break;
-    case SCREEN_MENU: handle_screen_menu(); break;
-    case SCREEN_VERSION: handle_screen_info(); break;
-    case SCREEN_DETAILS: handle_screen_info(); break;
-    case SCREEN_STATIONS: handle_screen_stations(); break;
-    case SCREEN_SYNC: handle_screen_sync(); break;
+    case SCREEN_CONNECT: handle_actions_connect(); break;
+    case SCREEN_MAIN: handle_actions_main(); break;
+    case SCREEN_VOLUME: handle_actions_volume(); break;
+    case SCREEN_MENU: handle_actions_menu(); break;
+    case SCREEN_VERSION: handle_actions_info(); break;
+    case SCREEN_DETAILS: handle_actions_info(); break;
+    case SCREEN_STATIONS: handle_actions_stations(); break;
+    case SCREEN_SYNC: handle_actions_sync(); break;
   }
 }
 
@@ -446,11 +508,35 @@ void update_screen_details() {
   }
 }
 
+void update_station_option(uint8_t id, uint8_t y, const char *title) {
+  if (cur_station == id) {
+    oled_icon(0, y, ICON_OPTION);
+  } else {
+    if (id == sel_station) {
+      oled_icon(0, y, ICON_NOTE);
+    } else {
+      u8x8.drawGlyph(0, y, ' ');
+    }
+  }
+  u8x8.drawString(1, y, title);
+}
+
 void update_screen_stations() {
   if (screen_updated) {
     u8x8.clearDisplay();
     oled_title(ICON_NOTE, "Stations");
+    preferences.begin(app_name, PREFERENCES_RO);
 
+    char key[] = "s0"; 
+    char key_title[] = "s0t";
+    for (int i = 0; i < MAX_STATIONS; i++) {
+      key[1] = '0' + i;
+      key_title[1] = '0' + i;
+
+      update_station_option(i, 2 + i, preferences.getString(key_title).c_str());
+    }
+
+    preferences.end();
     screen_updated = false;
   }
 }
@@ -526,6 +612,7 @@ void setup() {
   Serial.begin(115200);
   preferences.begin(app_name, PREFERENCES_RO);
   cur_volume = preferences.getShort("volume", 10);
+  sel_station = preferences.getShort("station", 0);
   preferences.end();
 
   rotaryEncoder.disableAcceleration();

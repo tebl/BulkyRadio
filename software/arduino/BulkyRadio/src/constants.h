@@ -5,6 +5,11 @@ const char *app_version = "0.1";
 #define PREFERENCES_RO true
 #define PREFERENCES_RW false
 
+#define MAX_STATIONS 6
+#define MAX_RECONNECT 3
+#define DELAY_ATTEMPT 1
+#define FIRST_STATION 0
+
 #define ONBOARD_LED  2
 #define I2S_DOUT 25
 #define I2S_BCLK 27
