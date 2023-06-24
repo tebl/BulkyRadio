@@ -1,6 +1,8 @@
 {
-  "s0t": "SID",
-  "s0u": "http://s1.a1radio.nl:8054/;",
-  "s1t": "NRK P3",
-  "s1u": "https://lyd.nrk.no/nrk_radio_p3_mp3_h"
+  "s0": "s1.a1radio.nl:8054/;",
+  "s1": "https://lyd.nrk.no/nrk_radio_p3_mp3_h",
+  "s2": "0n-80s.radionetz.de:8000/0n-70s.mp3",
+  "s3": "mediaserv30.live-streams.nl:8000/stream",
+  "s4": "www.surfmusic.de/m3u/100-5-das-hitradio,4529.m3u",
+  "s5": "https://stream.srg-ssr.ch/rsp/aacp_48.asx"
 }
