@@ -20,11 +20,11 @@ ezButton button(ENC_SW);
 Audio audio;
 uint8_t reconnects = 0;
 bool is_muted = true;
-bool is_halted = false;
+bool is_halted = !AUTOPLAY;
 
 bool screen_updated = true;
 unsigned long last_update = millis();
-uint8_t cur_screen = SCREEN_CONNECT;
+uint8_t cur_screen = AUTOPLAY ? SCREEN_CONNECT : SCREEN_MAIN;
 uint8_t cur_volume = DEFAULT_VOLUME;
 uint8_t cur_option = 0;
 uint8_t cur_station = 0;
@@ -92,6 +92,29 @@ void set_halted(bool value) {
   is_halted = value;
 }
 
+void write_volume() {
+  preferences.begin(app_name, PREFERENCES_RW);
+  preferences.putShort("volume", cur_volume);
+  preferences.end();
+  audio.setVolume(cur_volume);
+}
+
+void volume_up() {
+  set_screen(SCREEN_VOLUME);
+  if (cur_volume < MAX_VOLUME) {
+    cur_volume = cur_volume + 1;
+  }
+  write_volume();
+}
+
+void volume_down() {
+  set_screen(SCREEN_VOLUME);
+  if (cur_volume > 0) {
+    cur_volume = cur_volume - 1;
+  }
+  write_volume();
+}
+
 void perform_connect() {
   preferences.begin(app_name, PREFERENCES_RO);
 
@@ -122,29 +145,6 @@ void handle_actions_connect() {
       delay(DELAY_ATTEMPT * 1000);
     }
   }
-}
-
-void write_volume() {
-  preferences.begin(app_name, PREFERENCES_RW);
-  preferences.putShort("volume", cur_volume);
-  preferences.end();
-  audio.setVolume(cur_volume);
-}
-
-void volume_up() {
-  set_screen(SCREEN_VOLUME);
-  if (cur_volume < MAX_VOLUME) {
-    cur_volume = cur_volume + 1;
-  }
-  write_volume();
-}
-
-void volume_down() {
-  set_screen(SCREEN_VOLUME);
-  if (cur_volume > 0) {
-    cur_volume = cur_volume - 1;
-  }
-  write_volume();
 }
 
 void handle_actions_main() {
@@ -394,6 +394,16 @@ void oled_icon(uint8_t x, uint8_t y, uint8_t num) {
   }
 }
 
+uint8_t wlan_icon() {
+  switch (WiFi.status()) {
+  case WL_CONNECTED:
+    return ICON_WIFI;
+
+  default:
+    return ICON_UNCONNECTED;
+  }
+}
+
 uint8_t center_string(bool using_icon, const char *title) {
   uint8_t cols = 16;
   if (using_icon) cols - 2;
@@ -412,13 +422,22 @@ void oled_title(uint8_t icon, const char *title) {
     }
 }
 
-void update_screen_connect() {
-  if (screen_updated) {
-    u8x8.clearDisplay();
-    oled_icon(0, 0, ICON_WIFI);
-    u8x8.drawString(2, 0, WIFI_SSID);
-    u8x8.drawString(0, 2, "  Connecting...");
-    screen_updated = false;
+void oled_percent(uint8_t percent, uint8_t y, bool show_value = false) {
+  uint8_t x = 2;
+  if (show_value) x = 0;
+
+  oled_icon(x, y, ICON_LOWER);
+  oled_icon(x + 11, y, ICON_UPPER);
+  if (percent > 0) {
+    for (int i = 0; i < 10; i++) {
+      if (percent >= 5 + (i * 10)) oled_icon(x + i + 1, y, ICON_HALF);
+      if (percent >= 10 + (i * 10)) oled_icon(x + i + 1, y, ICON_FULL);
+    }
+  }
+
+  if (show_value) {
+    u8x8.setCursor(x + 13, y);
+    u8x8.print(percent);
   }
 }
 
@@ -443,35 +462,31 @@ void oled_span(uint8_t x, uint8_t y, const char *string, uint8_t num_lines = 2) 
   if (truncated) oled_icon(15, y + (num_lines - 1), ICON_TRUNCATED);
 }
 
-void update_screen_main() {
-  if (screen_updated || info_updated) {
+void update_screen_connect() {
+  if (screen_updated) {
     u8x8.clearDisplay();
-
-    oled_title(ICON_WIFI, WIFI_SSID);
-    oled_span(0, 2, info_station, 2);
-    oled_span(0, 5, info_title, 3);
-
-    info_updated = false;
+    oled_title(wlan_icon(), WIFI_SSID);
+    u8x8.drawString(0, 2, "  Connecting...");
     screen_updated = false;
   }
 }
 
-void oled_percent(uint8_t percent, uint8_t y, bool show_value = false) {
-  uint8_t x = 2;
-  if (show_value) x = 0;
+void update_screen_main() {
+  if (screen_updated || info_updated) {
+    u8x8.clearDisplay();
 
-  oled_icon(x, y, ICON_LOWER);
-  oled_icon(x + 11, y, ICON_UPPER);
-  if (percent > 0) {
-    for (int i = 0; i < 10; i++) {
-      if (percent >= 5 + (i * 10)) oled_icon(x + i + 1, y, ICON_HALF);
-      if (percent >= 10 + (i * 10)) oled_icon(x + i + 1, y, ICON_FULL);
+    if (is_halted) {
+      oled_title(wlan_icon(), WIFI_SSID);
+      oled_icon(1, 4, ICON_STOP);
+      u8x8.drawString(3, 4, "Not playing");
+  } else {
+      oled_title(ICON_WIFI, WIFI_SSID);
+      oled_span(0, 2, info_station, 2);
+      oled_span(0, 5, info_title, 3);
     }
-  }
 
-  if (show_value) {
-    u8x8.setCursor(x + 13, y);
-    u8x8.print(percent);
+    info_updated = false;
+    screen_updated = false;
   }
 }
 
