@@ -130,10 +130,14 @@ void perform_connect() {
 }
 
 void handle_actions_connect() {
-  set_halted(false);
+  audio.stopSong();
+  info_station[0] = 0;
+  info_bits[0] = 0;
+  info_title[0] = 0;
 
   perform_connect();
   if (audio.isRunning()) {
+    set_halted(false);
     unmute_dac();
     set_screen(SCREEN_MAIN);
   } else {
@@ -180,12 +184,11 @@ void handle_actions_volume() {
 }
 
 void handle_actions_info() {
-  if (timeout(SCREEN_MENU, SCREEN_MAX_IDLE)) return;
+  if (timeout(SCREEN_MAIN, SCREEN_MAX_IDLE)) return;
 
   switch (get_action()) {
     case ACTION_CLICK:
-      cur_option = OPTION_BACK;
-      set_screen(SCREEN_MENU);
+      set_screen(SCREEN_MAIN);
       break;
   }
 }
@@ -206,7 +209,6 @@ void handle_actions_menu() {
           set_sync_state(SYNC_IDLE);
           set_screen(SCREEN_SYNC);
           break;
-        case OPTION_BACK: set_screen(SCREEN_MAIN); break;
       }
       break;
     
@@ -362,7 +364,7 @@ void handle_actions_sync() {
       break;
   }
 
-  if (timeout(SCREEN_CONNECT, 2 * SCREEN_MAX_IDLE)) return;
+  if (timeout(SCREEN_CONNECT, SCREEN_SYNC_IDLE)) return;
   switch (get_action()) {
     case ACTION_CLICK:
       set_screen(SCREEN_CONNECT);
@@ -574,7 +576,6 @@ void update_screen_menu() {
     update_menu_option(OPTION_DETAILS, 3, "Details");
     update_menu_option(OPTION_VERSION, 4, "Version");
     update_menu_option(OPTION_SYNC, 5, "Sync");
-    update_menu_option(OPTION_BACK, 7, "Back");
     screen_updated = false;
   }
 }
@@ -685,10 +686,6 @@ void copy_string(char *destination, const char *source, const uint8_t max_length
   }
   destination[max_length - 1] = 0;
 }
-
-// void audio_info(const char *info){
-//     Serial.print("info        "); Serial.println(info);
-// }
 
 void audio_showstation(const char *info) {
   copy_string(info_station, info, INFO_LEN_STATION);
