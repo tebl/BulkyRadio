@@ -24,6 +24,7 @@ bool is_halted = !AUTOPLAY;
 
 bool screen_updated = true;
 unsigned long last_update = millis();
+uint8_t cur_font = 0;
 uint8_t cur_screen = AUTOPLAY ? SCREEN_CONNECT : SCREEN_MAIN;
 uint8_t cur_volume = DEFAULT_VOLUME;
 uint8_t cur_option = 0;
@@ -52,6 +53,33 @@ void set_screen(uint8_t new_screen) {
   cur_screen = new_screen;
   last_update = millis();
   screen_updated = true;
+}
+
+void set_font() {
+  switch(cur_font) {
+    #if MAX_FONTS > 1
+    case 1:  u8x8.setFont(u8x8_font_pxplusibmcga_f); break;
+    #endif
+    #if MAX_FONTS > 2
+    case 2:  u8x8.setFont(u8x8_font_5x8_f); break;
+    #endif
+    #if MAX_FONTS > 3
+    case 3:  u8x8.setFont(u8x8_font_pressstart2p_f); break;
+    #endif
+    #if MAX_FONTS > 4
+    case 4:  u8x8.setFont(u8x8_font_pcsenior_f); break;
+    #endif
+    #if MAX_FONTS > 5
+    case 5:  u8x8.setFont(u8x8_font_pxplusibmcgathin_f); break;
+    #endif
+    #if MAX_FONTS > 6
+    case 6:  u8x8.setFont(u8x8_font_5x7_f); break;
+    #endif
+    #if MAX_FONTS > 7
+    case 7:  u8x8.setFont(u8x8_font_pxplustandynewtv_f); break; 
+    #endif
+    default: u8x8.setFont(u8x8_font_amstrad_cpc_extended_f); break;
+  }
 }
 
 void set_sync_state(uint8_t new_state) {
@@ -209,6 +237,7 @@ void handle_actions_menu() {
           set_sync_state(SYNC_IDLE);
           set_screen(SCREEN_SYNC);
           break;
+        case OPTION_FONT: set_screen(SCREEN_FONT); break;
       }
       break;
     
@@ -372,6 +401,41 @@ void handle_actions_sync() {
   }
 }
 
+void write_font() {
+  preferences.begin(app_name, PREFERENCES_RW);
+  preferences.putShort("font", cur_font);
+  preferences.end();
+  set_font();
+}
+
+void handle_actions_font() {
+  if (timeout(SCREEN_MAIN, SCREEN_FONT_IDLE)) return;
+
+  switch (get_action()) {
+    case ACTION_CLICK:
+      set_screen(SCREEN_MAIN);
+      break;
+    
+    case ACTION_NEXT:
+      last_update = millis();
+      if (cur_font != MAX_FONTS) {
+        cur_font++;
+        write_font();
+        screen_updated = true;
+      }
+      break;
+
+    case ACTION_PREV:
+      last_update = millis();
+      if (cur_font != 0) {
+        cur_font--;
+        write_font();
+        screen_updated = true;
+      }
+      break;
+  }
+}
+
 void handle_actions() {
   if (!is_halted && !audio.isRunning()) {
     mute_dac();
@@ -387,6 +451,7 @@ void handle_actions() {
     case SCREEN_DETAILS: handle_actions_info(); break;
     case SCREEN_STATIONS: handle_actions_stations(); break;
     case SCREEN_SYNC: handle_actions_sync(); break;
+    case SCREEN_FONT: handle_actions_font(); break;
   }
 }
 
@@ -586,6 +651,7 @@ void update_screen_menu() {
     update_menu_option(OPTION_DETAILS, 3, "Details");
     update_menu_option(OPTION_VERSION, 4, "Version");
     update_menu_option(OPTION_SYNC, 5, "Sync");
+    update_menu_option(OPTION_FONT, 6, "Select font");
     screen_updated = false;
   }
 }
@@ -617,6 +683,22 @@ void update_screen_sync() {
   }
 }
 
+void update_screen_font() {
+  if (screen_updated) {
+    u8x8.clearDisplay();
+
+    oled_title(ICON_INFORMATION, "Font");
+    u8x8.drawGlyph(1, 2, '0' + cur_font + 1);
+    u8x8.drawString(3, 2, "Quick brown");
+    u8x8.drawString(3, 3, "fox jumps");
+    u8x8.drawString(3, 4, "over the");
+    u8x8.drawString(3, 5, "lazy dog");
+    oled_icon(13, 5, ICON_TRUNCATED);
+
+    screen_updated = false;
+  }
+}
+
 void update_screen() {
   switch(cur_screen) {
     case SCREEN_CONNECT: update_screen_connect(); break;
@@ -627,6 +709,7 @@ void update_screen() {
     case SCREEN_DETAILS: update_screen_details(); break;
     case SCREEN_STATIONS: update_screen_stations(); break;
     case SCREEN_SYNC: update_screen_sync(); break;
+    case SCREEN_FONT: update_screen_font(); break;
   }
 }
 
@@ -639,6 +722,8 @@ void setup() {
   preferences.begin(app_name, PREFERENCES_RO);
   cur_volume = preferences.getShort("volume", 10);
   sel_station = preferences.getShort("station", 0);
+  cur_font = preferences.getShort("font", 0);
+  if (cur_font > MAX_FONTS) cur_font = 0;
   preferences.end();
 
   rotaryEncoder.disableAcceleration();
@@ -647,11 +732,7 @@ void setup() {
   button.setDebounceTime(DEBOUNCE_DELAY);
 
   u8x8.begin();
-  // u8x8.setFont(u8x8_font_amstrad_cpc_extended_f);
-  // u8x8.setFont(u8x8_font_5x8_f);
-  // u8x8.setFont(u8x8_font_pxplusibmcga_f);
-  // u8x8.setFont(u8x8_font_pxplusibmcgathin_f);
-  u8x8.setFont(u8x8_font_pxplustandynewtv_f);
+  set_font();
 
   pinMode(ONBOARD_LED, OUTPUT);
   mute_dac();
