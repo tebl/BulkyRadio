@@ -7,7 +7,7 @@ const char *app_version = "0.1";
 
 #define MAX_STATIONS 6
 #define MAX_RECONNECT 3
-#define DELAY_ATTEMPT 1
+#define DELAY_RECONNECT 1
 #define FIRST_STATION 0
 
 #define MAX_FONTS 8
@@ -80,9 +80,9 @@ uint8_t oled_icons[ICON_COUNT * 8] = {
 #define ICON_TRUNCATED 14
 #define ICON_SYNC 15
 
-#define SCREEN_MAX_IDLE 5
+#define SCREEN_MAX_IDLE 10
 #define SCREEN_SYNC_IDLE 2*SCREEN_MAX_IDLE
-#define SCREEN_FONT_IDLE 4*SCREEN_MAX_IDLE
+#define SCREEN_FONT_IDLE 3*SCREEN_MAX_IDLE
 #define SCREEN_CONNECT 0
 #define SCREEN_MAIN 1
 #define SCREEN_VOLUME 2
@@ -100,6 +100,12 @@ uint8_t oled_icons[ICON_COUNT * 8] = {
 #define OPTION_SYNC OPTION_FIRST_ID+3
 #define OPTION_FONT OPTION_FIRST_ID+4
 #define OPTION_LAST_ID OPTION_FONT
+
+const char *option_title_stations = "Stations";
+const char *option_title_details = "Details";
+const char *option_title_version = "Version";
+const char *option_title_sync = "Sync Stations";
+const char *option_title_font = "Set Font";
 
 #define SYNC_IDLE 0
 #define SYNC_STARTED 1

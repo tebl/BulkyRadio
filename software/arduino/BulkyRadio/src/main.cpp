@@ -174,7 +174,7 @@ void handle_actions_connect() {
       set_halted(true);
       set_screen(SCREEN_MAIN);
     } else {
-      delay(DELAY_ATTEMPT * 1000);
+      delay(DELAY_RECONNECT * 1000);
     }
   }
 }
@@ -541,7 +541,8 @@ void update_screen_connect() {
   if (screen_updated) {
     u8x8.clearDisplay();
     oled_status();
-    u8x8.drawString(0, 2, "  Connecting...");
+    u8x8.drawString(2, 2, "Connecting");
+    oled_icon(13, 2, ICON_TRUNCATED);
     screen_updated = false;
   }
 }
@@ -580,7 +581,7 @@ void update_screen_volume() {
 void update_screen_version() {
   if (screen_updated) {
     u8x8.clearDisplay();
-    oled_title(ICON_INFORMATION, "Version");
+    oled_title(ICON_INFORMATION, option_title_version);
     u8x8.drawString(6, 4, app_version);
     screen_updated = false;
   }
@@ -589,7 +590,7 @@ void update_screen_version() {
 void update_screen_details() {
   if (screen_updated) {
     u8x8.clearDisplay();
-    oled_title(ICON_INFORMATION, "Details");
+    oled_title(ICON_INFORMATION, option_title_details);
 
     u8x8.drawString(0, 3, "Codec:");
     u8x8.drawString(0, 4, audio.getCodecname());
@@ -616,7 +617,7 @@ void update_station_option(uint8_t id, uint8_t y, const char *title) {
 void update_screen_stations() {
   if (screen_updated) {
     u8x8.clearDisplay();
-    oled_title(ICON_NOTE, "Stations");
+    oled_title(ICON_NOTE, option_title_stations);
     preferences.begin(app_name, PREFERENCES_RO);
 
     char key[] = "s0"; 
@@ -647,11 +648,11 @@ void update_screen_menu() {
     u8x8.clearDisplay();
     oled_title(ICON_INFORMATION, "Menu");
 
-    update_menu_option(OPTION_STATIONS, 2, "Stations");
-    update_menu_option(OPTION_DETAILS, 3, "Details");
-    update_menu_option(OPTION_VERSION, 4, "Version");
-    update_menu_option(OPTION_SYNC, 5, "Sync");
-    update_menu_option(OPTION_FONT, 6, "Select font");
+    update_menu_option(OPTION_STATIONS, 2, option_title_stations);
+    update_menu_option(OPTION_DETAILS, 3, option_title_details);
+    update_menu_option(OPTION_VERSION, 4, option_title_version);
+    update_menu_option(OPTION_SYNC, 5, option_title_sync);
+    update_menu_option(OPTION_FONT, 6, option_title_font);
     screen_updated = false;
   }
 }
@@ -659,7 +660,7 @@ void update_screen_menu() {
 void update_screen_sync() {
   if (screen_updated) {
     u8x8.clearDisplay();
-    oled_title(ICON_SYNC, "Sync");
+    oled_title(ICON_SYNC, option_title_sync);
 
     switch(sync_state) {
       case SYNC_DONE:
@@ -687,7 +688,7 @@ void update_screen_font() {
   if (screen_updated) {
     u8x8.clearDisplay();
 
-    oled_title(ICON_INFORMATION, "Font");
+    oled_title(ICON_INFORMATION, option_title_font);
     u8x8.drawGlyph(1, 2, '0' + cur_font + 1);
     u8x8.drawString(3, 2, "Quick brown");
     u8x8.drawString(3, 3, "fox jumps");
