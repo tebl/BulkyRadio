@@ -464,10 +464,18 @@ void oled_span(uint8_t x, uint8_t y, const char *string, uint8_t num_lines = 2) 
   if (truncated) oled_icon(15, y + (num_lines - 1), ICON_TRUNCATED);
 }
 
+void oled_status() {
+  if (SHOW_SSID) {
+    oled_title(wlan_icon(), WIFI_SSID);
+  } else {
+    oled_title(wlan_icon(), app_name);
+  }
+}
+
 void update_screen_connect() {
   if (screen_updated) {
     u8x8.clearDisplay();
-    oled_title(wlan_icon(), WIFI_SSID);
+    oled_status();
     u8x8.drawString(0, 2, "  Connecting...");
     screen_updated = false;
   }
@@ -478,11 +486,13 @@ void update_screen_main() {
     u8x8.clearDisplay();
 
     if (is_halted) {
-      oled_title(wlan_icon(), WIFI_SSID);
-      oled_icon(1, 4, ICON_STOP);
-      u8x8.drawString(3, 4, "Not playing");
+      oled_status();
+      oled_icon(2, 4, ICON_STOP);
+      u8x8.drawString(4, 4, "No station");
+      u8x8.drawString(4, 5, "selected");
+      oled_icon(13, 5, ICON_TRUNCATED);
   } else {
-      oled_title(ICON_WIFI, WIFI_SSID);
+      oled_status();
       oled_span(0, 2, info_station, 2);
       oled_span(0, 5, info_title, 3);
     }

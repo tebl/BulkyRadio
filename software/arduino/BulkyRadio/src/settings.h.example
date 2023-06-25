@@ -1,5 +1,6 @@
 #pragma once
 #define AUTOPLAY true
+#define SHOW_SSID false
 
 #define WIFI_SSID "SSID"
 #define WIFI_PASS "PASS"
