@@ -27,6 +27,7 @@ unsigned long last_update = millis();
 uint8_t cur_font = 0;
 uint8_t cur_screen = AUTOPLAY ? SCREEN_CONNECT : SCREEN_MAIN;
 uint8_t cur_volume = DEFAULT_VOLUME;
+short cur_balance = 0;
 uint8_t cur_option = 0;
 uint8_t cur_station = 0;
 uint8_t sel_station = 0;
@@ -196,7 +197,7 @@ void handle_actions_main() {
 }
 
 void handle_actions_volume() {
-  if (timeout(SCREEN_MAIN, SCREEN_MAX_IDLE)) return;
+  if (timeout(SCREEN_MAIN, SCREEN_IDLE)) return;
 
   switch (get_action()) {
     case ACTION_CLICK:
@@ -212,7 +213,7 @@ void handle_actions_volume() {
 }
 
 void handle_actions_info() {
-  if (timeout(SCREEN_MAIN, SCREEN_MAX_IDLE)) return;
+  if (timeout(SCREEN_MAIN, SCREEN_IDLE)) return;
 
   switch (get_action()) {
     case ACTION_CLICK:
@@ -222,7 +223,7 @@ void handle_actions_info() {
 }
 
 void handle_actions_menu() {
-  if (timeout(SCREEN_MAIN, SCREEN_MAX_IDLE)) return;
+  if (timeout(SCREEN_MAIN, SCREEN_IDLE)) return;
 
   switch (get_action()) {
     case ACTION_CLICK:
@@ -238,6 +239,7 @@ void handle_actions_menu() {
           set_screen(SCREEN_SYNC);
           break;
         case OPTION_FONT: set_screen(SCREEN_FONT); break;
+        case OPTION_BALANCE: set_screen(SCREEN_BALANCE); break;
       }
       break;
     
@@ -268,7 +270,7 @@ void write_station() {
 }
 
 void handle_actions_stations() {
-  if (timeout(SCREEN_MAIN, SCREEN_MAX_IDLE)) return;
+  if (timeout(SCREEN_MAIN, SCREEN_IDLE)) return;
 
   switch (get_action()) {
     case ACTION_CLICK:
@@ -436,6 +438,41 @@ void handle_actions_font() {
   }
 }
 
+void write_balance() {
+  preferences.begin(app_name, PREFERENCES_RW);
+  preferences.putShort("balance", cur_balance);
+  preferences.end();
+  audio.setBalance(cur_balance);
+}
+
+void handle_actions_balance() {
+  if (timeout(SCREEN_MAIN, SCREEN_BALANCE_IDLE)) return;
+
+  switch (get_action()) {
+    case ACTION_CLICK:
+      set_screen(SCREEN_MAIN);
+      break;
+    
+    case ACTION_NEXT:
+      last_update = millis();
+      if (cur_balance != MAX_BALANCE) {
+        cur_balance++;
+        write_balance();
+        screen_updated = true;
+      }
+      break;
+
+    case ACTION_PREV:
+      last_update = millis();
+      if (cur_balance != MIN_BALANCE) {
+        cur_balance--;
+        write_balance();
+        screen_updated = true;
+      }
+      break;
+  }
+}
+
 void handle_actions() {
   if (!is_halted && !audio.isRunning()) {
     mute_dac();
@@ -452,6 +489,7 @@ void handle_actions() {
     case SCREEN_STATIONS: handle_actions_stations(); break;
     case SCREEN_SYNC: handle_actions_sync(); break;
     case SCREEN_FONT: handle_actions_font(); break;
+    case SCREEN_BALANCE: handle_actions_balance(); break;
   }
 }
 
@@ -463,11 +501,12 @@ void oled_icon(uint8_t x, uint8_t y, uint8_t num) {
 
 uint8_t wlan_icon() {
   switch (WiFi.status()) {
-  case WL_CONNECTED:
-    return ICON_WIFI;
+    case WL_CONNECTED:
+      if (cur_volume == 0) return ICON_MUTE;
+      return ICON_WIFI;
 
-  default:
-    return ICON_UNCONNECTED;
+    default:
+      return ICON_UNCONNECTED;
   }
 }
 
@@ -653,6 +692,7 @@ void update_screen_menu() {
     update_menu_option(OPTION_VERSION, 4, option_title_version);
     update_menu_option(OPTION_SYNC, 5, option_title_sync);
     update_menu_option(OPTION_FONT, 6, option_title_font);
+    update_menu_option(OPTION_BALANCE, 7, option_title_balance);
     screen_updated = false;
   }
 }
@@ -700,6 +740,23 @@ void update_screen_font() {
   }
 }
 
+void update_screen_balance() {
+  if (screen_updated) {
+    u8x8.clearDisplay();
+    oled_title(ICON_VOLUME, option_title_balance);
+    uint8_t percent = map(cur_balance, MIN_BALANCE, MAX_BALANCE, 0, 100);
+
+    Serial.println(cur_balance);
+    u8x8.drawString(0, 2, "Left:");
+    oled_percent(100 - percent, 3, true);
+
+    u8x8.drawString(0, 5, "Right:");
+    oled_percent(percent, 6, true);
+
+    screen_updated = false;
+  }
+}
+
 void update_screen() {
   switch(cur_screen) {
     case SCREEN_CONNECT: update_screen_connect(); break;
@@ -711,6 +768,7 @@ void update_screen() {
     case SCREEN_STATIONS: update_screen_stations(); break;
     case SCREEN_SYNC: update_screen_sync(); break;
     case SCREEN_FONT: update_screen_font(); break;
+    case SCREEN_BALANCE: update_screen_balance(); break;
   }
 }
 
@@ -721,7 +779,8 @@ void IRAM_ATTR readEncoderISR() {
 void setup() {
   Serial.begin(115200);
   preferences.begin(app_name, PREFERENCES_RO);
-  cur_volume = preferences.getShort("volume", 10);
+  cur_volume = preferences.getShort("volume", DEFAULT_VOLUME);
+  cur_balance = preferences.getShort("balance", DEFAULT_BALANCE);
   sel_station = preferences.getShort("station", 0);
   cur_font = preferences.getShort("font", 0);
   if (cur_font > MAX_FONTS) cur_font = 0;
