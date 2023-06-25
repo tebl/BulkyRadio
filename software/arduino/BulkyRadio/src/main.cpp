@@ -746,11 +746,20 @@ void update_screen_balance() {
     oled_title(ICON_VOLUME, option_title_balance);
     uint8_t percent = map(cur_balance, MIN_BALANCE, MAX_BALANCE, 0, 100);
 
-    Serial.println(cur_balance);
-    u8x8.drawString(0, 2, "Left:");
+    if (percent == 100) {
+      oled_icon(0, 2, ICON_MUTE);
+    } else {
+      oled_icon(0, 2, ICON_VOLUME);
+    }
+    u8x8.drawString(2, 2, "Left:");
     oled_percent(100 - percent, 3, true);
 
-    u8x8.drawString(0, 5, "Right:");
+    if (percent == 0) {
+      oled_icon(0, 5, ICON_MUTE);
+    } else {
+      oled_icon(0, 5, ICON_VOLUME);
+    }
+    u8x8.drawString(2, 5, "Right:");
     oled_percent(percent, 6, true);
 
     screen_updated = false;
