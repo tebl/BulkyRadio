@@ -1,22 +1,65 @@
 #pragma once
-const char *app_name = "BulkyRadio";
-const char *app_version = "0.1";
+#include <Arduino.h>
 
 #define PREFERENCES_RO true
 #define PREFERENCES_RW false
+
+extern const char *app_name;
+extern const char *app_version;
 
 #define MAX_STATIONS 6
 #define MAX_RECONNECT 3
 #define DELAY_RECONNECT 1
 #define FIRST_STATION 0
-
 #define MAX_FONTS 8
 
-#define ONBOARD_LED  2
-#define I2S_DOUT 25
-#define I2S_BCLK 27
-#define I2S_LRC 26
-#define I2S_MUTE 4
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+  #define NEOPIXEL_PIN 48
+  #define NEOPIXEL_NUM 1
+  #define NEOPIXEL_LUM 5
+
+  #define I2S_DOUT 10   // DIN on DAC
+  #define I2S_BCLK 12   // Bit clock
+  #define I2S_LRC 11    // WSEL on DAC
+  #define I2S_MUTE 5
+
+  #define ENC_SW 21
+  #define ENC_DT 2
+  #define ENC_CLK 1
+#else
+  #define ONBOARD_LED  2
+
+  #define I2S_BCLK 27
+  #define I2S_DOUT 25
+  #define I2S_LRC 26
+  #define I2S_MUTE 4
+
+  #define I2C_SCK 22
+  #define I2C_SDA 21
+
+  #define ENC_SW 14
+  #define ENC_DT 33
+  #define ENC_CLK 32
+
+  /*
+  PIN_D2  ONBOARD_LED
+  PIN_D4  I2S_MUTE
+  PIN_D13 <unused>
+  PIN_D14 ENC_SW
+  PIN_D16 <unused>
+  PIN_D17 <unused>
+  PIN_D18 <unused>
+  PIN_D19 <unused>
+  PIN_D21 I2C_SDA
+  PIN_D22 I2C_SCK
+  PIN_D23 <unused>
+  PIN_D25 I2S_DOUT
+  PIN_D26 I2S_LRC
+  PIN_D27 I2S_BCLK
+  PIN_D32 ENC_CLK
+  PIN_D33 ENC_DT
+  */
+#endif 
 
 #define DEFAULT_VOLUME 10
 #define MAX_VOLUME 21
@@ -24,10 +67,7 @@ const char *app_version = "0.1";
 #define MIN_BALANCE -16
 #define MAX_BALANCE 16
 
-#define ENC_SW 14
-#define ENC_DT 33
-#define ENC_CLK 32
-#define ENC_STEPS 4
+#define ENC_STEPS 2
 
 #define ACTION_NONE 0
 #define ACTION_NEXT 1
@@ -49,25 +89,6 @@ const char *app_version = "0.1";
 #define BUTTON_LONGPRESS 250
 
 #define ICON_COUNT 17
-uint8_t oled_icons[ICON_COUNT * 8] = {
-  0x00, 0x7E, 0x7E, 0x3C, 0x3C, 0x18, 0x18, 0x00, // Play
-  0x00, 0x7E, 0x7E, 0x00, 0x00, 0x7E, 0x7E, 0x00, // Pause
-  0x00, 0x7E, 0x7E, 0x7E, 0x7E, 0x7E, 0x7E, 0x00, // Stop
-  0x00, 0x20, 0x50, 0x3E, 0x02, 0x04, 0x00, 0x00, // Note
-  0x7E, 0xFF, 0xFF, 0xA1, 0xA1, 0xFF, 0xFF, 0x7E, // Error
-  0x00, 0x70, 0x08, 0x64, 0x12, 0xCA, 0x2A, 0xA0, // Wifi
-  0x00, 0x7E, 0xFF, 0xFF, 0x7E, 0x00, 0x00, 0x00, // Half-bar
-  0x00, 0x7E, 0xFF, 0xFF, 0xFF, 0xFF, 0x7E, 0x00, // Full-bar
-  0x18, 0x24, 0x24, 0x24, 0x42, 0x81, 0xFF, 0x00, // Volume
-  0x00, 0x00, 0x00, 0x00, 0x7E, 0xFF, 0x81, 0x00, // Lower bounds
-  0x00, 0x81, 0xFF, 0x7E, 0x00, 0x00, 0x00, 0x00, // Upper bounds
-  0x00, 0x09, 0x04, 0x04, 0x09, 0xC0, 0x20, 0xA0, // Unconnected
-  0x0C, 0x12, 0x22, 0x44, 0x44, 0x22, 0x12, 0x0C, // Information
-  0x00, 0x00, 0xFE, 0x82, 0x44, 0x28, 0x10, 0x00, // Option
-  0x60, 0x60, 0x00, 0x60, 0x60, 0x00, 0x60, 0x60, // Truncated
-  0x7E, 0x81, 0x81, 0x89, 0x99, 0x3E, 0x18, 0x08, // Sync
-  0x1C, 0x22, 0x41, 0x7F, 0x00, 0x14, 0x08, 0x14, // Mute
-};
 #define ICON_PLAY 0
 #define ICON_PAUSE 1
 #define ICON_STOP 2
@@ -87,6 +108,7 @@ uint8_t oled_icons[ICON_COUNT * 8] = {
 #define ICON_MUTE 16
 
 #define SCREEN_IDLE 10
+extern uint8_t oled_icons[ICON_COUNT * 8];
 #define SCREEN_SYNC_IDLE 2*SCREEN_IDLE
 #define SCREEN_FONT_IDLE 3*SCREEN_IDLE
 #define SCREEN_BALANCE_IDLE 3*SCREEN_IDLE
@@ -111,15 +133,21 @@ uint8_t oled_icons[ICON_COUNT * 8] = {
 #define OPTION_BALANCE 5
 #define OPTION_LAST_ID OPTION_FIRST_ID+5
 
-const char *option_title_stations = "Stations";
-const char *option_title_details = "Details";
-const char *option_title_version = "Version";
-const char *option_title_sync = "Sync Stations";
-const char *option_title_font = "Set Font";
-const char *option_title_balance = "Set Balance";
-
 #define SYNC_IDLE 0
 #define SYNC_STARTED 1
 #define SYNC_ERROR 2
 #define SYNC_PARSE_ERROR 3
 #define SYNC_DONE 4
+
+extern const char *option_title_stations;
+extern const char *option_title_details;
+extern const char *option_title_version;
+extern const char *option_title_sync;
+extern const char *option_title_font;
+extern const char *option_title_balance;
+
+#define STATUS_NONE 0x000000
+#define STATUS_CONNECTING 0x0000FF
+#define STATUS_ONLINE 0x00FF00
+#define STATUS_BUSY 0xFF00FF
+#define STATUS_ERROR 0xFF0000

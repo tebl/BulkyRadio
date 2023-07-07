@@ -11,6 +11,7 @@
 #include <Wire.h>
 #include "constants.h"
 #include "settings.h"
+#include "status_led.h"
 
 Preferences preferences;
 AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ENC_CLK, ENC_DT, -1, -1, ENC_STEPS);
@@ -164,14 +165,17 @@ void handle_actions_connect() {
   info_bits[0] = 0;
   info_title[0] = 0;
 
+  set_status(STATUS_CONNECTING);
   perform_connect();
   if (audio.isRunning()) {
+    set_status(STATUS_BUSY);
     set_halted(false);
     unmute_dac();
     set_screen(SCREEN_MAIN);
   } else {
     reconnects++;
     if (reconnects == MAX_RECONNECT) {
+      set_status(STATUS_ERROR);
       set_halted(true);
       set_screen(SCREEN_MAIN);
     } else {
@@ -786,7 +790,9 @@ void IRAM_ATTR readEncoderISR() {
 }
 
 void setup() {
+  init_status();
   Serial.begin(115200);
+
   preferences.begin(app_name, PREFERENCES_RO);
   cur_volume = preferences.getShort("volume", DEFAULT_VOLUME);
   cur_balance = preferences.getShort("balance", DEFAULT_BALANCE);
@@ -795,30 +801,33 @@ void setup() {
   if (cur_font > MAX_FONTS) cur_font = 0;
   preferences.end();
 
-  rotaryEncoder.disableAcceleration();
   rotaryEncoder.begin();
+  rotaryEncoder.disableAcceleration();
+  rotaryEncoder.setBoundaries(0, 255, true);
   rotaryEncoder.setup(readEncoderISR);
   button.setDebounceTime(DEBOUNCE_DELAY);
 
   u8x8.begin();
   set_font();
+  update_screen_connect();
 
-  pinMode(ONBOARD_LED, OUTPUT);
-  mute_dac();
   pinMode(I2S_MUTE, OUTPUT);
+  mute_dac();
 
+  set_status(STATUS_CONNECTING);
   WiFi.disconnect();
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    digitalWrite(ONBOARD_LED, LOW);
+    set_status(STATUS_NONE);
     delay(500);
-    digitalWrite(ONBOARD_LED, HIGH);
+    set_status(STATUS_CONNECTING);
   }
-  digitalWrite(ONBOARD_LED, HIGH);
+  set_status(STATUS_ONLINE);
   audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
+  // audio.setBufsize(15000, 0);
   audio.setVolume(cur_volume);
 }
 
@@ -826,7 +835,6 @@ void loop() {
   button.loop();
   handle_actions();
   update_screen();
-
   audio.loop();
 }
 
@@ -846,6 +854,10 @@ void copy_string(char *destination, const char *source, const uint8_t max_length
   }
   destination[max_length - 1] = 0;
 }
+
+// void audio_info(const char *info){
+//     Serial.print("info        "); Serial.println(info);
+// }
 
 void audio_showstation(const char *info) {
   copy_string(info_station, info, INFO_LEN_STATION);
